@@ -1,0 +1,9 @@
+node_modules
+package-lock.json
+lib
+.eslintrc
+.eslintignore
+.prettierrc
+.prettierignore
+.gitignore
+tsconfig.json
