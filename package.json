@@ -10,7 +10,7 @@
     "prePublish": "npm run clean && tsc"
   },
   "bin": {
-    "tm": "bin/index.js"  
+    "tm": "bin/index.js"
   },
   "author": "",
   "license": "ISC",

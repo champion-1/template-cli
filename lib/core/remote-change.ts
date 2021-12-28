@@ -10,7 +10,6 @@ import LogSymbols from "log-symbols";
 import shell from "shelljs";
 import { prompt } from "inquirer";
 import {copyDir, rmDirFile} from "../utils/index";
-import logSymbols from "log-symbols";
 const app = new Command();
 /**解析 */
 app.parse(process.argv);
@@ -23,22 +22,33 @@ const opreation = ["change", "add"];
 const isGitUrl = remoteUrl ? remoteUrl.includes(".git") : false;
 const name = command && command === "change" ? "更改" : "新增";
 const templatePath = path.resolve(__dirname, `../remote-template/${template}`);
+const baseTemplatePath = path.resolve(__dirname, `../remote-template`);
+const baseTarPath = path.resolve(__dirname, `../template/`);
 const tarPath = path.resolve(__dirname, `../template/${template}`);
 const repo = ["github", "gitlab"];
 /**
  * 终端问题
  */
-const isAllQS = [
+
+const addQS = [
     {
         type: "confirm",
-        message: "would you update all templates",
-        name: "isAll"
-    }
+        name: "sureAdd",
+        message: "Did you mean add ?",
+    },
+];
+
+const sureChange = [
+    {
+        type: "confirm",
+        name: "sureChange",
+        message: "Did you mean change the template ?",
+    },
 ]
 
 /**配置文件 */
-const configPath = path.resolve(__dirname, "./tm-config.json");
-const isExitConfigFile = fs.existsSync(configPath);
+    const configPath = path.resolve(__dirname, "./tm-config.json");
+    const isExitConfigFile = fs.existsSync(configPath);
 const configs = isExitConfigFile ? JSON.parse(
     fs.readFileSync(
         configPath
@@ -54,6 +64,65 @@ if(!shell.which("git")) {
 };
 
 /**
+ * 增加模块
+ */
+ const onAddModule = () => {
+    const _config = {...configs, [template]: remoteUrl }
+    fs.writeFile(configPath, JSON.stringify(_config), err => {
+        if (!err) {
+            // const origin = repo.find(item => remoteUrl.includes(item));
+            const reg = /http(s):\/\/\S+?\//g;
+            const filePath = remoteUrl.split(reg);
+            // const finalPath = filePath[filePath.length - 1].slice(0,-4);
+            if (fs.existsSync(templatePath) && isEmptyDir(templatePath)) {
+                addTemplate(template, remoteUrl)
+            } else if (fs.existsSync(templatePath) && !isEmptyDir(templatePath)) {
+                rmDirFile(templatePath,() => {
+                    if (fs.existsSync(tarPath)) {
+                        rmDirFile(tarPath, () => {
+                            addTemplate(template, remoteUrl)
+                        })
+                    } else {
+                        addTemplate(template, remoteUrl);
+                    }
+                })
+            } else {
+                fs.mkdir(templatePath, error => {
+                    if (!error) {
+                        addTemplate(template, remoteUrl);
+                    } else {
+                        console.log(error)
+                    }
+                })
+            }
+            
+        } else {
+            console.log(err)
+        }
+    })
+}
+
+/**
+ * 改模板
+ */
+const onChangeModule = () => {
+    const _config = {...configs, [template]: remoteUrl }
+    fs.writeFile(configPath, JSON.stringify(_config), err => {
+        if (!err) {
+            rmDirFile(templatePath,() => {
+                rmDirFile(tarPath, () => {
+                    addTemplate(template, remoteUrl);
+                    console.log(chalk.green(`template ${template}'s remote address have been changed!`))
+                })
+            })
+            
+        } else {
+            console.log(err)
+        }
+    })
+}
+
+/**
  * 判断是否没有输入命令
  */
 if (!command || !opreation.includes(command)) {
@@ -65,114 +134,94 @@ if (!isGitUrl || !remoteUrl) {
     console.log(chalk.red("Unexpected token on git url"))
     shell.exit(1);
 }
-
-if (!isExitConfigFile && command === "change") {
-    console.log(`Please Add a template's url before change it!`);
-    shell.exit(1);
-}
-
-if (command === "add") {
-    const _config = {...configs, [template]: remoteUrl }
-    fs.writeFile(configPath, JSON.stringify(_config), err => {
-        if (!err) {
-            const origin = repo.find(item => remoteUrl.includes(item));
-            const reg = /http(s):\/\/\S+?\//g;
-            const filePath = remoteUrl.split(reg);
-            const finalPath = filePath[filePath.length - 1].slice(0,-4);
-            if (fs.existsSync(templatePath)) {
-                download(`direct:${remoteUrl}#master`, path.join(__dirname, `../remote-template/${template}`) , {clone: true}, (error: any) => {
-                    if (error) {
-                        shell.cd(path.join(__dirname, `../remote-template/${template}`))
-                        if(shell.exec(`git clone ${remoteUrl}`).code !== 0) {
-                            console.log(error);
-                        } else {
-                            copyDir(templatePath, tarPath, () => {
-                                rmDirFile(path.join(tarPath, "./.git"))
-                                console.log("Add a template successfully！");
-                            })
-                        }
-                    } else {
-                        copyDir(templatePath, tarPath, () => {
-                            rmDirFile(path.join(tarPath, "./.git"))
-                            console.log("Add a template successfully！");
-                        })
-                    }
-                });
-            } else {
-                fs.mkdir(templatePath, error => {
-                    if (!error) {
-                        download(`direct:${remoteUrl}#master`, path.join(__dirname, `../remote-template/${template}`), { clone: true }, (error: any) => {
-                            if (error) {
-                                console.log(error);
-                            } else {
-                                copyDir(templatePath, tarPath, () => {
-                                    console.log("Add a template successfully！");
-                                    rmDirFile(path.join(tarPath, "./.git"))
-                                })
-                            }
-                        });
-                    } else {
-                        console.log(error)
-                    }
-                })
-            }
-            
-        } else {
-            console.log(err)
-        }
-    })
-} else {
-    const _config = {...configs, [template]: remoteUrl }
-    fs.writeFile(configPath, JSON.stringify(_config), err => {
-        if (!err) {
-            rmDirFile(templatePath,() => {
-                download(remoteUrl, `../remote-template/${template}`, {}, (error: any) => {
-                    if (error) {
-                        console.log(error);
-                    } else {
-                        copyDir(templatePath, tarPath, () => {
-                            console.log("Add a template successfully！");
-                        })
-                    }
-                });
-            })
-            
-        } else {
-            console.log(err)
+if (!isExitConfigFile) {
+    fs.writeFile(configPath, JSON.stringify({}), error => {
+        if (error) {
+            shell.exit(1);
         }
     })
 }
-/**处理新增模板远程分支 */
-function remoteUrlHandler() {
-    if (command === "add") {
-        fs.access(path.resolve(__dirname, "./tm-config.json"), err => {
-            if (!err) {
-                const config = {
-                    demo1: remoteUrl
-                }
-                fs.writeFile(path.resolve(__dirname, "./tm-config.json"), JSON.stringify(config), "utf-8", err => {
-                    if (!err) {
-                        console.log(chalk.green("remote url change successfullhbnnnnnny"))
-                    } else {
-                        console.log(chalk.red(err))
-                    }
-                })
-            } else {
-                const config = {
-                    demo1: remoteUrl
-                }
-                console.log(err, "err---->")
-                fs.writeFile(path.resolve(__dirname, "./tm-config.json") , JSON.stringify(config), "utf-8", err => {
-                    if (!err) {
-                        console.log(`remote url has changed as ${chalk.bgGreen(remoteUrl)}`)
-                    } else {
-                        console.log(chalk.red(err))
-                    }
-                })
-            }
-        });
-    
-    }
+
+if (!fs.existsSync(baseTemplatePath)) {
+    fs.mkdir(baseTemplatePath, err => {
+        if (err) {
+            console.log( chalk.red("Something errored when create remote dir"));
+        }
+    })
 }
 
+if (!fs.existsSync(baseTarPath)) {
+    fs.mkdir(baseTarPath, err => {
+        if (err) {
+            console.log( chalk.red("Something errored when create remote dir"));
+        }
+    })
+}
+
+if (command === "add" && !Object.keys(configs).includes(template)) {
+    onAddModule();
+} else if (command === "add" && Object.keys(configs).includes(template)) {
+    prompt(sureChange).then(res => {
+        if (res.sureChange) {
+            onChangeModule()
+        } else {
+            shell.exit(1);
+        }
+    }).catch(err => {
+        console.log(err);
+        shell.exit(1);
+    })
+    // onChangeModule()
+}else if(command === "change" && Object.keys(configs).includes(template)){
+    onChangeModule();
+} else if (!Object.keys(configs).includes(template) && command === "change") {
+    prompt(addQS).then(res => {
+        console.log(res, "res====>")
+        if (res.sureAdd) {
+            onAddModule();
+        } else {
+            console.log(res, "res===>error")
+            shell.exit(1)
+        }
+    }).catch(err => {
+        console.log(err);
+        shell.exit(1);
+    })
+}
+
+/**
+ * 
+ * @param templateName 模板名称
+ * @param tar  目标w
+ * @param remotePath 
+ */
+export const addTemplate = (templateName: string, remotePath: string) => {
+    const templateDir = path.resolve(__dirname, `../remote-template/${templateName}`);
+    const tarDir = path.resolve(__dirname, `../template/${templateName}`);
+    shell.cd(`${templateDir}`);
+    shell.exec(`git clone ${remotePath}`, (code, stdout, stderr) => {
+        if (code !== 0) {
+            console.log(`something error: ${stderr}`);
+        } else {
+            copyDir(templateDir, tarDir, () => {
+                rmDirFile(path.join(tarDir, "./.git"), () => {
+                    console.log("Add a template successfully！");
+                    return;
+                })
+            });
+        }
+    });
+}
+
+
+export const isEmptyDir = (dirPath: string): Boolean | void => {
+    fs.readdir(dirPath, (err: NodeJS.ErrnoException | null, files: string[]) => {
+        if (err) {
+            console.log(err);
+            shell.exit(1);
+        } else {
+            return files.length === 0;
+        }
+    })
+}
 

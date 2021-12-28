@@ -59,7 +59,7 @@ export const copyFile = (srcPath: string, tarPath: string, cb?: () => void) => {
  */
  export const copyDir = (srcDir: string, tarDir: string, cb?: () => void) => {
     if (fs.existsSync(tarDir)) {
-        fs.readdir(srcDir, (err:any, files:any) => {
+        fs.readdir(srcDir, (err:any, files: string[]) => {
             let count = 0;
             const checkend = () => {
                 console.log(`${(count / files.length) * 100}%`, srcDir, tarDir)
