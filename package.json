@@ -3,6 +3,7 @@
   "version": "1.0.0",
   "description": "",
   "main": "dist/lib/library.js",
+  "keywords": ["cli", "typescript", "template"],
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
     "clean": "rimraf dist",
@@ -12,7 +13,7 @@
   "bin": {
     "tm": "bin/index.js"
   },
-  "author": "",
+  "author": "champion-1",
   "license": "ISC",
   "devDependencies": {
     "@types/inquirer": "^8.1.3",
